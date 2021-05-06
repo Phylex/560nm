@@ -22,4 +22,5 @@ target_link_libraries(firmware
 	hardware_pwm
 	hardware_irq
 	hardware_i2c
+	hardware_dma
 )
