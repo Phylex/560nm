@@ -31,6 +31,11 @@ uint8_t message_flag = 0;
 uint16_t adc_result = 0;
 uint8_t valve_state = 0;
 
+uint8_t adc_buf[CAPTURE_DEPTH];
+float mean_adc_val;
+uint dma_chan;
+dma_channel_config dma_cfg;
+
 void i2c_handler() {
     // Get interrupt status
     uint32_t status = i2c0->hw->intr_stat;
@@ -47,11 +52,13 @@ void i2c_handler() {
     if (status & I2C_IC_INTR_STAT_R_RX_FULL_BITS) {
 		// Read the data (this will clear the interrupt)
 		uint8_t rx_fifo_level = (uint8_t)(i2c0->hw->rxflr & I2C_IC_RXFLR_BITS);
+		printf("receivied a i2c packet\n");
 		for (uint8_t i = 0; i < rx_fifo_level; i++) {
 
 			// for every entry the data_cmd_reg needs to be read
 			uint32_t cmd_reg = i2c0->hw->data_cmd;
 			uint8_t value = (uint8_t)(cmd_reg & I2C_IC_DATA_CMD_DAT_BITS);
+			printf("byte %d: 0x%02x\n", i, value);
 			// Check if this is the 1st byte we have received
 			if (cmd_reg & I2C_IC_DATA_CMD_FIRST_DATA_BYTE_BITS) {
 				// as this is a new message, reset the buffer pointer
@@ -69,11 +76,11 @@ void i2c_handler() {
 	if (status & I2C_IC_INTR_STAT_R_RD_REQ_BITS) {
 
 		// Write the data from the current address in RAM
-		i2c0->hw->data_cmd = (uint32_t)(adc_result >> 8);
-		//i2c0->hw->data_cmd = (uint32_t)(valve_state);
+		i2c0->hw->data_cmd = (uint32_t)(((uint8_t) mean_adc_val) >> 24);
 
 		// Clear the interrupt
 		i2c0->hw->clr_rd_req;
+		message_flag = MSG_TX;
 	}
 }
 
@@ -97,29 +104,6 @@ void i2c_init_slave_intr(i2c_inst_t* i2c, void (* irq_handler)(void), uint rx_fu
     irq_set_enabled(irq_num, true);
 }
 
-uint8_t adc_buf[CAPTURE_DEPTH];
-float mean_adc_val;
-uint dma_chan;
-dma_channel_config dma_cfg;
-
-// adc average function
-void adc_dma_average() {
-	// reinitialize the dma
-	dma_channel_configure(dma_chan, &dma_cfg,
-			adc_buf,
-			&adc_hw->fifo,
-			CAPTURE_DEPTH,
-			true
-	);
-	uint32_t adc_sum = 0;
-	for (int i=0; i<CAPTURE_DEPTH; i++) {
-		adc_sum += adc_buf[i];
-	}
-	mean_adc_val = (float)(adc_sum)/CAPTURE_DEPTH;
-}
-
-// adc dma buffer allocation and other neccesarily global info
-
 int main() {
 	bi_decl(bi_program_description("Firmware for the autonomous plant watering project"));
 	bi_decl(bi_1pin_with_name(LED_PIN, "On-board LED"));
@@ -133,6 +117,7 @@ int main() {
 
 	// initialize the ADC
 	adc_init();
+	sleep_ms(2000);
 	adc_gpio_init(MOIST_SNS);
 	adc_select_input(0);
 	adc_fifo_setup(
@@ -146,7 +131,12 @@ int main() {
 	adc_set_clkdiv(4800);
 
 	// initialize the DMA for the ADC
-	dma_chan = dma_claim_unused_channel(true);
+	dma_chan = dma_claim_unused_channel(false);
+	if (dma_chan == -1) {
+		printf("dma channel could not be aquired\n");
+	} else {
+		printf("aquired dma channel: %d\n", dma_chan);
+	}
 	dma_cfg = dma_channel_get_default_config(dma_chan);
 	// configure to read from a constant address and write to an incrementing one
 	channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -158,11 +148,9 @@ int main() {
 			adc_buf,   //dst
 			&adc_hw->fifo, //src
 			CAPTURE_DEPTH, //size
-			true
+			true //start now
 	);
-	dma_channel_set_irq0_enabled(dma_chan, true);
-	irq_set_enabled(DMA_IRQ_0, true);
-	irq_set_exclusive_handler(DMA_IRQ_0, adc_dma_average);
+	adc_run(true);
 
 	// initialize the I2C
 	uint baudrate = i2c_init(i2c0, 100000);
@@ -182,10 +170,11 @@ int main() {
 	while (true) {
 		if (message_flag == MSG_RX) {
 			printf("Received i2c packet\n");
-			uint8_t size = bp - buffer;
-			if (size != MSG_SIZE){
+			uint8_t size = (bp - buffer);
+			if (size != MSG_SIZE + 1){
 				printf("Invalid size of %d", size);
 				bp = buffer;
+				message_flag = 0;
 				continue;
 			}
 			switch (buffer[CMD_BYTE]) {
@@ -202,6 +191,21 @@ int main() {
 			}
 			printf("\n");
 			message_flag = 0;
+		} else if (message_flag == MSG_TX) {
+			printf("sent adc val of %f\n", mean_adc_val);
+			message_flag = 0;
+		}
+		if (!dma_channel_is_busy(dma_chan)) {
+			// reinitialize the dma
+			uint32_t adc_sum = 0;
+			for (int i=0; i<CAPTURE_DEPTH; i++) {
+				adc_sum += adc_buf[i];
+			}
+			mean_adc_val = (float)(adc_sum)/CAPTURE_DEPTH;
+			adc_run(false);
+			adc_fifo_drain();
+			dma_channel_set_write_addr(dma_chan, adc_buf, true);
+			adc_run(true);
 		}
 	}
 }
