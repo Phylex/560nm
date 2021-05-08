@@ -15,9 +15,12 @@
 #define CLOSE_VALVE 2
 #define MSG_SIZE 2
 #define CAPTURE_DEPTH 2048
+#define MOIST_CHAN 0
+#define LIGHT_CHAN 1
 
 const uint LED_PIN = 25;
 const uint MOIST_SNS = 26;
+const uint LIGHT_SNS = 27;
 const uint I2C_SCL = 1;
 const uint I2C_SDA = 0;
 const uint VLV_CTRL = 2;
@@ -32,7 +35,9 @@ uint16_t adc_result = 0;
 uint8_t valve_state = 0;
 
 uint8_t adc_buf[CAPTURE_DEPTH];
-float mean_adc_val;
+uint adc_chan = 0;
+float moisture = 0;
+float lightness = 0;
 uint dma_chan;
 dma_channel_config dma_cfg;
 
@@ -104,7 +109,31 @@ void i2c_init_slave_intr(i2c_inst_t* i2c, void (* irq_handler)(void), uint rx_fu
     irq_set_enabled(irq_num, true);
 }
 
+void adc_handler() {
+	adc_run(false);
+	adc_fifo_drain();
+	uint32_t adc_sum = 0;
+	for (int i=0; i<CAPTURE_DEPTH; i++) {
+		adc_sum += adc_buf[i];
+	}
+	float adc_mean = (float)(adc_sum)/CAPTURE_DEPTH;
+	if (adc_chan == MOIST_CHAN){
+		printf("Moisture read");
+		moisture = adc_mean;
+		adc_chan = LIGHT_CHAN;
+		adc_select_input(adc_chan);
+	} else if (adc_chan == LIGHT_CHAN){
+		printf("lightness read");
+		lightness = adc_mean;
+		adc_chan = MOIST_CHAN;
+		adc_select_input(adc_chan);
+	}
+	dma_channel_set_write_addr(dma_chan, adc_buf, true);
+	adc_run(true);
+}
+
 int main() {
+	// name the pins;
 	bi_decl(bi_program_description("Firmware for the autonomous plant watering project"));
 	bi_decl(bi_1pin_with_name(LED_PIN, "On-board LED"));
 	bi_decl(bi_1pin_with_name(MOIST_SNS, "ADC Input from moisture sensor"));
@@ -112,14 +141,15 @@ int main() {
 	bi_decl(bi_1pin_with_name(I2C_SCL, "I2C Serial Clock Line"));
 	bi_decl(bi_2pins_with_func(I2C_SCL, I2C_SDA, GPIO_FUNC_I2C));
 	bi_decl(bi_1pin_with_name(VLV_CTRL, "Valve control Pin"));
-
+	bi_decl(bi_1pin_with_name(LIGHT_SNS, "ADC Input of the photo-resistor"));
+	// initialize the stdio
 	stdio_init_all();
 
 	// initialize the ADC
 	adc_init();
 	sleep_ms(2000);
 	adc_gpio_init(MOIST_SNS);
-	adc_select_input(0);
+	adc_gpio_init(LIGHT_SNS);
 	adc_fifo_setup(
 		true, // write to the sample fifo
 		true, // Enable DMA request
@@ -134,8 +164,6 @@ int main() {
 	dma_chan = dma_claim_unused_channel(false);
 	if (dma_chan == -1) {
 		printf("dma channel could not be aquired\n");
-	} else {
-		printf("aquired dma channel: %d\n", dma_chan);
 	}
 	dma_cfg = dma_channel_get_default_config(dma_chan);
 	// configure to read from a constant address and write to an incrementing one
@@ -144,13 +172,19 @@ int main() {
 	channel_config_set_write_increment(&dma_cfg, true);
 	// start transfers on the request of the adc
 	channel_config_set_dreq(&dma_cfg, DREQ_ADC);
+	// initialize the interrupt
+	dma_channel_set_irq0_enabled(dma_chan, true);
+	irq_set_exclusive_handler(DMA_IRQ_0, adc_handler);
+    irq_set_enabled(DMA_IRQ_0, true);
+	// configure the channel and start up the dma
+	adc_chan = MOIST_CHAN;
+	adc_select_input(adc_chan);
 	dma_channel_configure(dma_chan, &dma_cfg,
 			adc_buf,   //dst
 			&adc_hw->fifo, //src
 			CAPTURE_DEPTH, //size
 			true //start now
 	);
-	adc_run(true);
 
 	// initialize the I2C
 	uint baudrate = i2c_init(i2c0, 100000);
@@ -166,6 +200,10 @@ int main() {
 	// initialize the valve output
 	gpio_init(VLV_CTRL);
 	gpio_set_dir(VLV_CTRL, GPIO_OUT);
+
+	// set the adc running and start the moisture and brightness sensing
+	adc_run(true);
+
 
 	while (true) {
 		if (message_flag == MSG_RX) {
@@ -194,18 +232,6 @@ int main() {
 		} else if (message_flag == MSG_TX) {
 			printf("sent adc val of %f\n", mean_adc_val);
 			message_flag = 0;
-		}
-		if (!dma_channel_is_busy(dma_chan)) {
-			// reinitialize the dma
-			uint32_t adc_sum = 0;
-			for (int i=0; i<CAPTURE_DEPTH; i++) {
-				adc_sum += adc_buf[i];
-			}
-			mean_adc_val = (float)(adc_sum)/CAPTURE_DEPTH;
-			adc_run(false);
-			adc_fifo_drain();
-			dma_channel_set_write_addr(dma_chan, adc_buf, true);
-			adc_run(true);
 		}
 	}
 }
