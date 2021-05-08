@@ -81,8 +81,13 @@ void i2c_handler() {
 	if (status & I2C_IC_INTR_STAT_R_RD_REQ_BITS) {
 
 		// Write the data from the current address in RAM
-		i2c0->hw->data_cmd = (uint32_t)(((uint8_t) mean_adc_val) >> 24);
-
+		void *moistptr = &moisture;
+		void *lightptr = &lightness;
+		irq_set_enabled(DMA_IRQ_0, false);
+		i2c_write_raw_blocking(i2c0, (uint8_t *)moistptr, 4);
+		i2c_write_raw_blocking(i2c0, (uint8_t *)lightptr, 4);
+		irq_set_enabled(DMA_IRQ_0, true);
+		
 		// Clear the interrupt
 		i2c0->hw->clr_rd_req;
 		message_flag = MSG_TX;
@@ -230,7 +235,9 @@ int main() {
 			printf("\n");
 			message_flag = 0;
 		} else if (message_flag == MSG_TX) {
-			printf("sent adc val of %f\n", mean_adc_val);
+			printf("sent moist val of %f\nand light val of %f\n",
+			       moisture,
+			       lightness);
 			message_flag = 0;
 		}
 	}
