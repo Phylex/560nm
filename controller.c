@@ -42,6 +42,7 @@ uint dma_chan;
 dma_channel_config dma_cfg;
 
 void i2c_handler() {
+	printf("i2c handler\n");
     // Get interrupt status
     uint32_t status = i2c0->hw->intr_stat;
 
@@ -51,7 +52,8 @@ void i2c_handler() {
 	// The peripheral is stateless, so that two consecutive requests will be answered independently
 	// from each other, only referencing the device state.
 	if (status & I2C_IC_INTR_STAT_R_TX_ABRT_BITS) {
-		i2c0->hw->clr_tx_abrt;
+		printf("tx abbort\n");
+		uint32_t abrt_reg = i2c0->hw->clr_tx_abrt;
 	}
 	// Check to see if we have received data from the I2C controller
     if (status & I2C_IC_INTR_STAT_R_RX_FULL_BITS) {
@@ -79,19 +81,25 @@ void i2c_handler() {
 
 	// Check to see if the I2C controller is requesting data from the RAM
 	if (status & I2C_IC_INTR_STAT_R_RD_REQ_BITS) {
-
-		// Write the data from the current address in RAM
-		void *moistptr = &moisture;
-		void *lightptr = &lightness;
-		irq_set_enabled(DMA_IRQ_0, false);
-		i2c_write_raw_blocking(i2c0, (uint8_t *)moistptr, 4);
-		i2c_write_raw_blocking(i2c0, (uint8_t *)lightptr, 4);
-		irq_set_enabled(DMA_IRQ_0, true);
-		
+		printf("read request\n");
 		// Clear the interrupt
 		i2c0->hw->clr_rd_req;
+		// Write the data from the current address in RAM
+		if ((i2c0->hw->rxflr & I2C_IC_RXFLR_BITS) == 0) {
+			printf("writing bytes in read request\n");
+			uint8_t byte_array[4];
+			*((float *)byte_array) = moisture;
+			for (int i=0; i<sizeof(float); i++) {
+				i2c0->hw->data_cmd = (uint32_t)(byte_array[i]);
+			}
+			*((float *)byte_array) = lightness;
+			for (int i=0; i<sizeof(float); i++) {
+				i2c0->hw->data_cmd = (uint32_t)(byte_array[i]);
+			}
+		}
 		message_flag = MSG_TX;
 	}
+	printf("exiting i2c handler\n");
 }
 
 // i2c0->hw->intr_mask = (I2C_IC_INTR_MASK_M_RD_REQ_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS);
@@ -115,20 +123,20 @@ void i2c_init_slave_intr(i2c_inst_t* i2c, void (* irq_handler)(void), uint rx_fu
 }
 
 void adc_handler() {
+	printf("adc_handler\n");
 	adc_run(false);
 	adc_fifo_drain();
+	dma_hw->ints0 = (1u << dma_chan);
 	uint32_t adc_sum = 0;
 	for (int i=0; i<CAPTURE_DEPTH; i++) {
 		adc_sum += adc_buf[i];
 	}
 	float adc_mean = (float)(adc_sum)/CAPTURE_DEPTH;
 	if (adc_chan == MOIST_CHAN){
-		printf("Moisture read");
 		moisture = adc_mean;
 		adc_chan = LIGHT_CHAN;
 		adc_select_input(adc_chan);
 	} else if (adc_chan == LIGHT_CHAN){
-		printf("lightness read");
 		lightness = adc_mean;
 		adc_chan = MOIST_CHAN;
 		adc_select_input(adc_chan);
@@ -146,13 +154,13 @@ int main() {
 	bi_decl(bi_1pin_with_name(I2C_SCL, "I2C Serial Clock Line"));
 	bi_decl(bi_2pins_with_func(I2C_SCL, I2C_SDA, GPIO_FUNC_I2C));
 	bi_decl(bi_1pin_with_name(VLV_CTRL, "Valve control Pin"));
-	bi_decl(bi_1pin_with_name(LIGHT_SNS, "ADC Input of the photo-resistor"));
+	bi_decl(bi_1pin_with_name(LIGHT_SNS, "ADC Input of the photo-resistor" ));
 	// initialize the stdio
 	stdio_init_all();
-
-	// initialize the ADC
-	adc_init();
 	sleep_ms(2000);
+	// initialize the ADC
+	printf("setting up adc\n");
+	adc_init();
 	adc_gpio_init(MOIST_SNS);
 	adc_gpio_init(LIGHT_SNS);
 	adc_fifo_setup(
@@ -162,10 +170,11 @@ int main() {
 		false,// no error bit
 		true  // shift to eight bits
 	);
-	// start a new conversion after 4800 cycles
-	adc_set_clkdiv(4800);
+	// set the adc
+	adc_set_clkdiv(48000.);
 
 	// initialize the DMA for the ADC
+	printf("setting up dma\n");
 	dma_chan = dma_claim_unused_channel(false);
 	if (dma_chan == -1) {
 		printf("dma channel could not be aquired\n");
@@ -190,11 +199,14 @@ int main() {
 			CAPTURE_DEPTH, //size
 			true //start now
 	);
-
+	
+	printf("setting up i2c\n");
 	// initialize the I2C
 	uint baudrate = i2c_init(i2c0, 100000);
 	i2c_set_slave_mode(i2c0, true, I2C_ADDR);
-	i2c_init_slave_intr(i2c0, i2c_handler, 2, (uint32_t)(I2C_IC_INTR_MASK_M_RD_REQ_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS));
+	i2c_init_slave_intr(i2c0, i2c_handler, 2, (uint32_t)(I2C_IC_INTR_MASK_M_RD_REQ_BITS | 
+	                                                     I2C_IC_INTR_MASK_M_RX_FULL_BITS | 
+	                                                     I2C_IC_INTR_MASK_M_TX_ABRT_BITS));
 	// configure gpio pins for i2c operation
 	gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
 	gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
@@ -207,6 +219,7 @@ int main() {
 	gpio_set_dir(VLV_CTRL, GPIO_OUT);
 
 	// set the adc running and start the moisture and brightness sensing
+	printf("starting adc\n");
 	adc_run(true);
 
 
