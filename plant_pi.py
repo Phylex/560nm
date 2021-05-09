@@ -6,7 +6,7 @@ import busio
 i2c = busio.I2C(board.SCL, board.SDA, 100000)
 
 plants = i2c.scan()
-if !i2c.try_lock():
+if i2c.try_lock() is not True:
     print("Could not aquire exclusive use of the i2c")
     exit(1)
 
