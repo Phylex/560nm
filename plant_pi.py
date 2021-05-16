@@ -2,10 +2,14 @@ import time
 import struct
 import board
 import busio
+<<<<<<< HEAD
 from prometheus_client import start_http_server, Gauge
+=======
+>>>>>>> 33e6f096d8a8b1c4b0e627d720f89a71541bf3d0
 
-i2c = busio.I2C(board.SCL, board.SDA)
+i2c = busio.I2C(board.SCL, board.SDA, 100000)
 
+<<<<<<< HEAD
 class PlantPot():
     def __init__(bus, address):
         self.address = address

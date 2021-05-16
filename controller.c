@@ -171,7 +171,7 @@ int main() {
 		true  // shift to eight bits
 	);
 	// set the adc
-	adc_set_clkdiv(48000.);
+	adc_set_clkdiv(24000);
 
 	// initialize the DMA for the ADC
 	printf("setting up dma\n");
