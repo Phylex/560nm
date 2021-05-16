@@ -10,6 +10,7 @@
 #define BUF_LEN 100
 #define MSG_RX 1
 #define MSG_TX 2
+#define NO_MSG 0
 #define CMD_BYTE 0
 #define OPEN_VALVE 1
 #define CLOSE_VALVE 2
@@ -42,7 +43,6 @@ uint dma_chan;
 dma_channel_config dma_cfg;
 
 void i2c_handler() {
-	printf("i2c handler\n");
     // Get interrupt status
     uint32_t status = i2c0->hw->intr_stat;
 
@@ -52,20 +52,18 @@ void i2c_handler() {
 	// The peripheral is stateless, so that two consecutive requests will be answered independently
 	// from each other, only referencing the device state.
 	if (status & I2C_IC_INTR_STAT_R_TX_ABRT_BITS) {
-		printf("tx abbort\n");
 		uint32_t abrt_reg = i2c0->hw->clr_tx_abrt;
+		message_flag = NO_MSG;
 	}
 	// Check to see if we have received data from the I2C controller
     if (status & I2C_IC_INTR_STAT_R_RX_FULL_BITS) {
 		// Read the data (this will clear the interrupt)
 		uint8_t rx_fifo_level = (uint8_t)(i2c0->hw->rxflr & I2C_IC_RXFLR_BITS);
-		printf("receivied a i2c packet\n");
 		for (uint8_t i = 0; i < rx_fifo_level; i++) {
 
 			// for every entry the data_cmd_reg needs to be read
 			uint32_t cmd_reg = i2c0->hw->data_cmd;
 			uint8_t value = (uint8_t)(cmd_reg & I2C_IC_DATA_CMD_DAT_BITS);
-			printf("byte %d: 0x%02x\n", i, value);
 			// Check if this is the 1st byte we have received
 			if (cmd_reg & I2C_IC_DATA_CMD_FIRST_DATA_BYTE_BITS) {
 				// as this is a new message, reset the buffer pointer
@@ -81,12 +79,10 @@ void i2c_handler() {
 
 	// Check to see if the I2C controller is requesting data from the RAM
 	if (status & I2C_IC_INTR_STAT_R_RD_REQ_BITS) {
-		printf("read request\n");
 		// Clear the interrupt
 		i2c0->hw->clr_rd_req;
 		// Write the data from the current address in RAM
 		if ((i2c0->hw->rxflr & I2C_IC_RXFLR_BITS) == 0) {
-			printf("writing bytes in read request\n");
 			uint8_t byte_array[4];
 			*((float *)byte_array) = moisture;
 			for (int i=0; i<sizeof(float); i++) {
@@ -99,7 +95,6 @@ void i2c_handler() {
 		}
 		message_flag = MSG_TX;
 	}
-	printf("exiting i2c handler\n");
 }
 
 // i2c0->hw->intr_mask = (I2C_IC_INTR_MASK_M_RD_REQ_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS);
@@ -123,7 +118,6 @@ void i2c_init_slave_intr(i2c_inst_t* i2c, void (* irq_handler)(void), uint rx_fu
 }
 
 void adc_handler() {
-	printf("adc_handler\n");
 	adc_run(false);
 	adc_fifo_drain();
 	dma_hw->ints0 = (1u << dma_chan);
