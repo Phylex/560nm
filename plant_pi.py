@@ -28,7 +28,7 @@ class PlantPot():
     def get_measurements(self):
         buf = bytearray(8)
         self.last_measurement = time.time()
-        self.bus.readfrom_into(self.address, buf, 0, 8)
+        self.bus.readfrom_into(self.address, buf, start=0, end=8)
         self.moisture = struct.unpack('f', buf[0:4])
         self.moisture = 255 - self.moisture
         self.brightness = struct.unpack('f', buf[4:8])
