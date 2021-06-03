@@ -49,15 +49,20 @@ class PlantPot():
         return self.moisture
 
 
-i2c = busio.I2C(board.SCL, board.SDA, 100000)
-peripherals = i2c.scan()
-if i2c.try_lock() == False:
-    print("Could not aquire exclusive use of the i2c")
-    exit(1)
+if __name__ == '__main__':
+    i2c = busio.I2C(board.SCL, board.SDA, 100000)
+    peripherals = i2c.scan()
+    if i2c.try_lock() == False:
+        exit(1)
 
-plants = []
-for p in peripherals:
-    pot = PlantPot(i2c, p)
-    plants.append(pot)
+    plants = []
+    for p in peripherals:
+        pot = PlantPot(i2c, p)
+        plants.append(pot)
 
-start_http_server(8000)
+    start_http_server(8000)
+    while True:
+        for plant in plants:
+            plant.get_moisture()
+            plant.get_brightness()
+        time.sleep(1)
