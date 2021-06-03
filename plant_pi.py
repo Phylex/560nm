@@ -2,16 +2,11 @@ import time
 import struct
 import board
 import busio
-<<<<<<< HEAD
 from prometheus_client import start_http_server, Gauge
-=======
->>>>>>> 33e6f096d8a8b1c4b0e627d720f89a71541bf3d0
 
-i2c = busio.I2C(board.SCL, board.SDA, 100000)
 
-<<<<<<< HEAD
 class PlantPot():
-    def __init__(bus, address):
+    def __init__(self, bus, address):
         self.address = address
         self.bus = bus
         self.moisture = None
@@ -23,8 +18,8 @@ class PlantPot():
         self.b = Gauge('plant_{}_brightness'.format(self.address),
                        'The local brightness of the environment at Plant {}'.format(self.address))
         self.b.set_function(lambda: self.get_brightness())
-        peripherals = bus.scan()
-        if address is not in peripherals:
+        peripherals = self.bus.scan()
+        if address not in peripherals:
             raise ValueError("The given address cannot be found on the bus")
             exit(1)
 
@@ -54,8 +49,9 @@ class PlantPot():
         return self.moisture
 
 
+i2c = busio.I2C(board.SCL, board.SDA, 100000)
 peripherals = i2c.scan()
-if !i2c.try_lock():
+if i2c.try_lock() == False:
     print("Could not aquire exclusive use of the i2c")
     exit(1)
 
