@@ -22,8 +22,8 @@
 const uint LED_PIN = 25;
 const uint MOIST_SNS = 26;
 const uint LIGHT_SNS = 27;
-const uint I2C_SCL = 1;
-const uint I2C_SDA = 0;
+const uint I2C_SCL = 17;
+const uint I2C_SDA = 16;
 const uint VLV_CTRL = 2;
 const float conversion_factor = 3.3f / (1 << 12);
 const uint I2C_ADDR = 0x30;
@@ -151,9 +151,8 @@ int main() {
 	bi_decl(bi_1pin_with_name(LIGHT_SNS, "ADC Input of the photo-resistor" ));
 	// initialize the stdio
 	stdio_init_all();
-	sleep_ms(2000);
+
 	// initialize the ADC
-	printf("setting up adc\n");
 	adc_init();
 	adc_gpio_init(MOIST_SNS);
 	adc_gpio_init(LIGHT_SNS);
@@ -168,7 +167,6 @@ int main() {
 	adc_set_clkdiv(24000);
 
 	// initialize the DMA for the ADC
-	printf("setting up dma\n");
 	dma_chan = dma_claim_unused_channel(false);
 	if (dma_chan == -1) {
 		printf("dma channel could not be aquired\n");
