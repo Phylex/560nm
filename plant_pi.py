@@ -13,7 +13,7 @@ class PlantPot():
         self.bus = bus
         self.moisture = None
         self.brightness = None
-        self.last_measurement = None
+        self.last_measurement = 0
         self.m = Gauge('plant_{}_moisture'.format(self.address),
                        'The moisture level in pot of plant {}'.format(self.address))
         self.m.set_function(lambda: self.get_moisture())
