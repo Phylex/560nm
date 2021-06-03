@@ -1,0 +1,3 @@
+[submodule "plantpot_hardware/libs/KiCad-RP-Pico"]
+	path = plantpot_hardware/libs/KiCad-RP-Pico
+	url = git@github.com:ncarandini/KiCad-RP-Pico.git
