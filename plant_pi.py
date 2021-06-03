@@ -40,16 +40,17 @@ class PlantPot():
 
     def get_brightness(self):
         now = time.time()
-        if abs(now - self.last_measurement) > 1:
+        if now - self.last_measurement > 1:
             self.get_measurements()
         return self.brightness
 
     def get_moisture(self):
         now = time.time()
-        if abs(now - self.last_measurement) > 1:
+        if now - self.last_measurement > 1:
             self.get_measurements()
         return self.moisture
 
+app = Flask(__name__)
 
 i2c = busio.I2C(board.SCL, board.SDA, 100000)
 peripherals = i2c.scan()
@@ -60,8 +61,6 @@ plants = []
 for p in peripherals:
     pot = PlantPot(i2c, p)
     plants.append(pot)
-
-app = Flask(__name__)
 
 @app.route("/metrics")
 def get_plant_status():
