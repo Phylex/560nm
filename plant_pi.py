@@ -2,7 +2,9 @@ import time
 import struct
 import board
 import busio
-from prometheus_client import start_http_server, Gauge
+from prometheus_client import Gauge, generate_latest
+from prometheus_client.core import CollectorRegistry
+from flask import Response, Flask, request
 
 
 class PlantPot():
@@ -49,20 +51,24 @@ class PlantPot():
         return self.moisture
 
 
-if __name__ == '__main__':
-    i2c = busio.I2C(board.SCL, board.SDA, 100000)
-    peripherals = i2c.scan()
-    if i2c.try_lock() == False:
-        exit(1)
+i2c = busio.I2C(board.SCL, board.SDA, 100000)
+peripherals = i2c.scan()
+if i2c.try_lock() == False:
+    exit(1)
 
-    plants = []
-    for p in peripherals:
-        pot = PlantPot(i2c, p)
-        plants.append(pot)
+plants = []
+for p in peripherals:
+    pot = PlantPot(i2c, p)
+    plants.append(pot)
 
-    start_http_server(8000)
-    while True:
-        for plant in plants:
-            plant.get_moisture()
-            plant.get_brightness()
-        time.sleep(1)
+app = Flask(__name__)
+
+@app.route("/metrics")
+def get_plant_status():
+    """ generates the response for the metrics request with the plant
+    health data"""
+    response = []
+    for plant in plants:
+        response.append(generate_latest(plant.m))
+        response.append(generate_latest(plant.b))
+    return Response(response, mimetype="text/plain")
