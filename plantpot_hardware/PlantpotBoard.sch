@@ -47,8 +47,6 @@ F 3 "~" H 2750 3150 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 Wire Wire Line
-	3550 3150 4100 3150
-Wire Wire Line
 	2950 3150 3250 3150
 $Comp
 L power:GND #PWR0101
@@ -273,17 +271,6 @@ F 3 "" H 6150 3350 50  0001 C CNN
 $EndComp
 Wire Wire Line
 	5500 3350 6150 3350
-$Comp
-L power:+3.3VADC #PWR0109
-U 1 1 60BD6D4A
-P 2600 4100
-F 0 "#PWR0109" H 2750 4050 50  0001 C CNN
-F 1 "+3.3VADC" H 2615 4273 50  0000 C CNN
-F 2 "" H 2600 4100 50  0001 C CNN
-F 3 "" H 2600 4100 50  0001 C CNN
-	1    2600 4100
-	1    0    0    -1  
-$EndComp
 Wire Wire Line
 	2600 4100 2600 4150
 Wire Wire Line
@@ -308,22 +295,16 @@ Wire Wire Line
 $Comp
 L power:+3.3V #PWR0111
 U 1 1 60BE7B93
-P 6900 3550
-F 0 "#PWR0111" H 6900 3400 50  0001 C CNN
-F 1 "+3.3V" H 6915 3723 50  0000 C CNN
-F 2 "" H 6900 3550 50  0001 C CNN
-F 3 "" H 6900 3550 50  0001 C CNN
-	1    6900 3550
+P 6650 3450
+F 0 "#PWR0111" H 6650 3300 50  0001 C CNN
+F 1 "+3.3V" H 6665 3623 50  0000 C CNN
+F 2 "" H 6650 3450 50  0001 C CNN
+F 3 "" H 6650 3450 50  0001 C CNN
+	1    6650 3450
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	6900 3550 6900 3600
-Wire Wire Line
-	6900 3600 7150 3600
-Text GLabel 6950 3700 0    50   Input ~ 0
+Text GLabel 7000 3600 0    50   Input ~ 0
 MOIST
-Wire Wire Line
-	6950 3700 7150 3700
 $Comp
 L power:GND #PWR0112
 U 1 1 60BE9520
@@ -452,4 +433,31 @@ Wire Wire Line
 	5950 3850 5950 4150
 Wire Wire Line
 	5950 4150 6150 4150
+$Comp
+L power:+3.3V #PWR?
+U 1 1 60BA8822
+P 2600 4100
+F 0 "#PWR?" H 2600 3950 50  0001 C CNN
+F 1 "+3.3V" H 2615 4273 50  0000 C CNN
+F 2 "" H 2600 4100 50  0001 C CNN
+F 3 "" H 2600 4100 50  0001 C CNN
+	1    2600 4100
+	1    0    0    -1  
+$EndComp
+Text GLabel 3550 3150 2    50   Input ~ 0
+Solenoid
+Text GLabel 5850 4350 2    50   Input ~ 0
+Solenoid
+Wire Wire Line
+	5500 3950 5750 3950
+Wire Wire Line
+	5750 3950 5750 4350
+Wire Wire Line
+	5750 4350 5850 4350
+Wire Wire Line
+	7000 3600 7150 3600
+Wire Wire Line
+	6650 3450 6650 3700
+Wire Wire Line
+	6650 3700 7150 3700
 $EndSCHEMATC
