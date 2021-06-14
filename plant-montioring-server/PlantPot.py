@@ -2,6 +2,7 @@ import datetime
 import struct
 import sqlite3
 import sys
+import os
 import board
 import busio
 
@@ -57,12 +58,12 @@ class PlantManager():
                 plant_in_db = self.db_cursor.execute(
                         'SELECT id, species '
                         'FROM plant WHERE address = ?',
-                        (adr))
+                        adr).fetchone()
             self.plants.append(PlantPot(self.i2c, adr, plant_in_db['id']))
 
     def measure_all_pots(self):
         for plant in self.plants:
-            plant.get_measurement()
+            plant.get_measurements()
             self.db_cursor.execute(
                     'INSERT into measurements '
                     '(plant_id, time, moisture, brightness) '
@@ -87,12 +88,20 @@ def add_all_pots_in_address_range(db_path):
                     'SELECT id, species FROM '
                     'plant WHERE address = ?', (p,)
             ).fetchone()
-
             if plant is None:
                 species = input(f'Species of plant in pot {p}:')
                 cur.execute(
                         'INSERT into plant '
                         '(address, species) VALUES '
-                        '(?, ?, ?)', (p, species))
+                        '(?, ?)', (p, species))
                 con.commit()
                 print(f'added plant in pot no {p} of the {species} species to the db')
+
+def setup_database(db_path, schema_path):
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+    with open(schema_path) as f:
+        cur.executescript(f.read())
+        con.commit()
+    con.close()
+    add_all_pots_in_address_range(db_path)
