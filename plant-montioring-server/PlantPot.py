@@ -5,11 +5,10 @@ import sys
 import board
 import busio
 
+adr_range = list(range(10, 50))
 
 class PlantPot():
     def __init__(self, bus, address, plant_id):
-        self.db_path = db_path
-        self.db_connection = None
         self.address = address
         self.bus = bus
         self.id = plant_id
@@ -36,12 +35,10 @@ class PlantPot():
 
 
 class PlantManager():
-    def __init__(self, bus_path, db_path, min_interval):
-        self.adr_range = list(range(10, 50))
+    def __init__(self, db_path, min_interval):
         self.db_path = db_path
         self.db_connection = None
         self.db_cursor = None
-        self.bus_path = bus_path
         self.min_interval = min_interval
         try:
             self.db_connection = sqlite3.connect(self.db_path)
@@ -56,7 +53,7 @@ class PlantManager():
         peripherals = self.i2c.scan()
         self.plants = []
         for adr in peripherals:
-            if adr in self.adr_range:
+            if adr in adr_range:
                 plant_in_db = self.db_cursor.execute(
                         'SELECT id, species '
                         'FROM plant WHERE address = ?',
@@ -78,3 +75,24 @@ class PlantManager():
     def __del__(self):
         self.db_connection.close()
         self.i2c.unlock()
+
+def add_all_pots_in_address_range(db_path):
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+    i2c = busio.I2C(board.SCL, board.SDA, 100000)
+    peripherals = i2c.scan()
+    for p in peripherals:
+        if p in adr_range:
+            plant = cur.execute(
+                    'SELECT id, species FROM '
+                    'plant WHERE address = ?', (p,)
+            ).fetchone()
+
+            if plant is None:
+                species = input(f'Species of plant in pot {p}:')
+                cur.execute(
+                        'INSERT into plant '
+                        '(address, species) VALUES '
+                        '(?, ?, ?)', (p, species))
+                con.commit()
+                print(f'added plant in pot no {p} of the {species} species to the db')
