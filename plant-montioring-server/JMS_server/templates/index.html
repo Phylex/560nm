@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="description" content="The Jungle Management System is a home automation solution for watering many plants on one
+					window ledge or in an other connected area">
+		<title>JMS</title>
+	</head>
+	<body>
+		<h1>JMS</h1>
+		<h2>Plants under Management</h2>
+		<ul>
+			{% for plant in plants %}
+			<li>{{plant.species}} at bus address {{plant.address}}</li>
+			{% endfor %}
+		</ul>
+		<h2>Plants not under Management</h2>
+		<ul>
+			{% for plant_address in unregistered_plants %}
+			<li>Plant found at bus address {{plant_address}}</li>
+			{% endfor %}
+	</body>
+</html>
+
