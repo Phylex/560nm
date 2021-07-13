@@ -2,6 +2,7 @@ import busio
 import board
 import db
 from PlantPot import PlantPot, adr_range
+import asyncio as aio
 
 class PlantBusError(Exception):
     pass
@@ -10,7 +11,7 @@ class AlreadyRegistered(Exception):
     pass
 
 class PlantManager():
-    async def __init__(self, app):
+    def __init__(self, app):
         self.app = app
         # set up i2c conneciton
         self.i2c = busio.I2C(board.SCL, board.SDA, 100000)
@@ -18,7 +19,7 @@ class PlantManager():
             raise PlantBusError
         self.plants = []
         self.unregistered_plants = []
-        await self._update_plant_registers()
+        aio.create_task(self._update_plant_registers())
 
     async def _update_plant_registers(self):
         peripherals = self.i2c.scan()
@@ -65,5 +66,5 @@ class PlantManager():
                                          plant.moisture,
                                          plant.timestamp)
 
-    async def __del__(self):
+    def __del__(self):
         self.i2c.unlock()
