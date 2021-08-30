@@ -12,3 +12,8 @@ build/
 *.egg-info/
 
 *.gbr
+*.gbrobj
+*.kicad_pcb-back
+*.sch-bak
+*.fp-info-cache
+gerber.zip
